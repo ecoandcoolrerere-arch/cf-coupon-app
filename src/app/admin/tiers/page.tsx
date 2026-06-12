@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { CouponTier, DiscountType } from '@/lib/types'
 import { formatDiscountLabel } from '@/lib/utils'
 import { Plus, Trash2, Pencil, X, Check } from 'lucide-react'
+import { createTier, updateTier, deleteTier } from './actions'
 
 const discountTypes: { value: DiscountType; label: string; placeholder: string }[] = [
   { value: 'percentage', label: '割引率 (%)', placeholder: '10' },
@@ -175,19 +176,19 @@ export default function TiersPage() {
     if (!campaignId) { setError('キャンペーンが見つかりません。先にキャンペーンを作成してください。'); return }
     setLoading(true)
 
-    const { error: insertError } = await supabase.from('coupon_tiers').insert({
-      campaign_id: campaignId,
-      name: form.name,
-      min_amount: parseInt(form.min_amount, 10),
-      description: form.description || null,
-      discount_type: form.discount_type,
-      discount_value: form.discount_value,
-      valid_from: form.valid_from || null,
-      valid_until: form.valid_until || null,
-    })
-
-    if (insertError) {
-      setError(`追加エラー: ${insertError.message}`)
+    try {
+      await createTier({
+        campaign_id: campaignId,
+        name: form.name,
+        min_amount: parseInt(form.min_amount, 10),
+        description: form.description || null,
+        discount_type: form.discount_type,
+        discount_value: form.discount_value,
+        valid_from: form.valid_from || null,
+        valid_until: form.valid_until || null,
+      })
+    } catch (err) {
+      setError(`追加エラー: ${err instanceof Error ? err.message : '不明なエラー'}`)
       setLoading(false)
       return
     }
@@ -199,8 +200,12 @@ export default function TiersPage() {
 
   async function handleDelete(id: string) {
     if (!confirm('このリターンを削除しますか？')) return
-    await supabase.from('coupon_tiers').delete().eq('id', id)
-    setTiers((prev) => prev.filter((t) => t.id !== id))
+    try {
+      await deleteTier(id)
+      setTiers((prev) => prev.filter((t) => t.id !== id))
+    } catch (err) {
+      setError(`削除エラー: ${err instanceof Error ? err.message : '不明なエラー'}`)
+    }
   }
 
   function startEdit(t: CouponTier) {
@@ -215,16 +220,21 @@ export default function TiersPage() {
 
   async function handleUpdate(id: string) {
     setSavingId(id)
-    await supabase.from('coupon_tiers').update({
-      name: editForm.name,
-      min_amount: parseInt(editForm.min_amount, 10),
-      description: editForm.description || null,
-      discount_type: editForm.discount_type,
-      discount_value: editForm.discount_value,
-      valid_from: editForm.valid_from || null,
-      valid_until: editForm.valid_until || null,
-    }).eq('id', id)
-
+    try {
+      await updateTier(id, {
+        name: editForm.name,
+        min_amount: parseInt(editForm.min_amount, 10),
+        description: editForm.description || null,
+        discount_type: editForm.discount_type,
+        discount_value: editForm.discount_value,
+        valid_from: editForm.valid_from || null,
+        valid_until: editForm.valid_until || null,
+      })
+    } catch (err) {
+      setError(`更新エラー: ${err instanceof Error ? err.message : '不明なエラー'}`)
+      setSavingId(null)
+      return
+    }
     await load()
     setEditingId(null)
     setEditForm(emptyForm)
