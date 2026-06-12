@@ -145,16 +145,25 @@ export default function TiersPage() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editForm, setEditForm] = useState<TierForm>(emptyForm)
   const [savingId, setSavingId] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
   const [form, setForm] = useState<TierForm>(emptyForm)
 
   const supabase = createClient()
 
   async function load() {
-    const { data: campaign } = await supabase.from('campaigns').select('id').limit(1).single()
+    const { data: campaign, error: campaignError } = await supabase.from('campaigns').select('id').limit(1).single()
+    if (campaignError) {
+      setError(`キャンペーン取得エラー: ${campaignError.message}`)
+      return
+    }
     if (campaign) setCampaignId(campaign.id)
 
-    const { data } = await supabase.from('coupon_tiers').select('*').order('min_amount')
+    const { data, error: tiersError } = await supabase.from('coupon_tiers').select('*').order('min_amount')
+    if (tiersError) {
+      setError(`リターン取得エラー: ${tiersError.message}`)
+      return
+    }
     if (data) setTiers(data)
   }
 
@@ -162,10 +171,11 @@ export default function TiersPage() {
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault()
-    if (!campaignId) { alert('キャンペーンが見つかりません'); return }
+    setError(null)
+    if (!campaignId) { setError('キャンペーンが見つかりません。先にキャンペーンを作成してください。'); return }
     setLoading(true)
 
-    await supabase.from('coupon_tiers').insert({
+    const { error: insertError } = await supabase.from('coupon_tiers').insert({
       campaign_id: campaignId,
       name: form.name,
       min_amount: parseInt(form.min_amount, 10),
@@ -175,6 +185,12 @@ export default function TiersPage() {
       valid_from: form.valid_from || null,
       valid_until: form.valid_until || null,
     })
+
+    if (insertError) {
+      setError(`追加エラー: ${insertError.message}`)
+      setLoading(false)
+      return
+    }
 
     setForm(emptyForm)
     await load()
@@ -219,6 +235,12 @@ export default function TiersPage() {
     <div className="max-w-2xl">
       <h1 className="text-2xl font-bold mb-2">リターン設定</h1>
       <p className="text-sm text-gray-500 mb-8">支援金額ごとのクーポン内容を設定します</p>
+
+      {error && (
+        <div className="mb-4 rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-600">
+          {error}
+        </div>
+      )}
 
       <div className="space-y-3 mb-8">
         {tiers.length === 0 ? (
