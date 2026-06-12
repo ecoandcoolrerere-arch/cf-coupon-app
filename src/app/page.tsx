@@ -14,8 +14,7 @@ export default function LandingPage() {
             uKa<br />開店クラウドファンディング
           </h1>
           <p className="mt-4 text-gray-600 leading-relaxed">
-            こだわりの食材を使った本格レストランの開店を応援してください。
-            支援いただいた方には特別クーポンをお届けします。
+            僕ら3兄弟を応援いただきありがとうございます！長く愛される店舗を目指していきます。
           </p>
           <div className="mt-8 flex flex-col sm:flex-row gap-3 justify-center">
             <Link
