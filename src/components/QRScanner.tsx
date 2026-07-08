@@ -98,6 +98,7 @@ export default function QRScanner({ onScan }: Props) {
               className="h-64 w-64 object-cover"
               playsInline
               muted
+              autoPlay
             />
             <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
               <div className="h-40 w-40 rounded-lg border-2 border-white opacity-60" />
