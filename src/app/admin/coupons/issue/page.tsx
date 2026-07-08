@@ -60,10 +60,10 @@ export default function IssueCouponPage() {
     setResult(null)
 
     const rows = parseCsvRows(csvText)
+    const reversedTiers = [...tiers].reverse()
     const payload = rows.map((r) => {
-      const matchedTier = tiers.find(
-        (t) => t.name === r.tier_name || t.min_amount <= r.support_amount
-      )
+      const matchedTier = (r.tier_name ? tiers.find((t) => t.name === r.tier_name) : undefined)
+        ?? reversedTiers.find((t) => t.min_amount <= r.support_amount)
       return {
         supporter_name: r.supporter_name,
         supporter_email: r.supporter_email,

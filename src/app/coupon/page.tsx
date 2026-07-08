@@ -1,16 +1,24 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Mail, Search, ArrowLeft } from 'lucide-react'
+import { formatDiscountLabel } from '@/lib/utils'
+import { CouponTier } from '@/lib/types'
+
+type LookupCoupon = {
+  id: string
+  code: string
+  status: string
+  support_amount: number | null
+  coupon_tiers?: Pick<CouponTier, 'name' | 'discount_type' | 'discount_value'> | null
+}
 
 export default function CouponLookupPage() {
   const [email, setEmail] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [coupons, setCoupons] = useState<Array<{ id: string; code: string; status: string; coupon_tiers?: { name: string } | null }> | null>(null)
-  const router = useRouter()
+  const [coupons, setCoupons] = useState<LookupCoupon[] | null>(null)
 
   async function handleSearch(e: React.FormEvent) {
     e.preventDefault()
@@ -31,11 +39,7 @@ export default function CouponLookupPage() {
       setError('このメールアドレスに紐づくクーポンは見つかりませんでした')
       return
     }
-    if (data.length === 1) {
-      router.push(`/coupon/${data[0].code}`)
-    } else {
-      setCoupons(data)
-    }
+    setCoupons(data)
   }
 
   return (
@@ -75,9 +79,11 @@ export default function CouponLookupPage() {
             <p className="mt-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-600">{error}</p>
           )}
 
-          {coupons && coupons.length > 1 && (
+          {coupons && coupons.length > 0 && (
             <div className="mt-4 space-y-2">
-              <p className="text-sm text-gray-500 font-medium">クーポンが複数あります。確認するクーポンを選んでください:</p>
+              <p className="text-sm text-gray-500 font-medium">
+                {coupons.length > 1 ? `${coupons.length}件のクーポンが見つかりました。確認するクーポンを選んでください:` : 'クーポンが見つかりました:'}
+              </p>
               {coupons.map((c) => (
                 <Link
                   key={c.code}
@@ -85,10 +91,16 @@ export default function CouponLookupPage() {
                   className="flex items-center justify-between rounded-xl border border-gray-200 px-4 py-3 hover:bg-gray-50 transition"
                 >
                   <div>
-                    <p className="font-medium text-sm">{c.coupon_tiers?.name ?? 'クーポン'}</p>
-                    <p className="text-xs font-mono text-gray-400">{c.code}</p>
+                    <p className="font-medium text-sm">
+                      {c.coupon_tiers ? formatDiscountLabel(c.coupon_tiers as CouponTier) : 'クーポン'}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      {c.coupon_tiers?.name ?? ''}
+                      {c.support_amount ? `　¥${c.support_amount.toLocaleString()} 支援` : ''}
+                    </p>
+                    <p className="text-xs font-mono text-gray-400 mt-0.5">{c.code}</p>
                   </div>
-                  <span className={`text-xs px-2 py-1 rounded-full ${c.status === 'unused' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                  <span className={`text-xs px-2 py-1 rounded-full shrink-0 ${c.status === 'unused' ? 'bg-green-100 text-green-700' : c.status === 'used' ? 'bg-gray-100 text-gray-500' : 'bg-red-100 text-red-500'}`}>
                     {c.status === 'unused' ? '未使用' : c.status === 'used' ? '使用済み' : '期限切れ'}
                   </span>
                 </Link>
