@@ -71,6 +71,14 @@ export default function QRScanner({ onScan }: Props) {
       }
       setActive(true)
       rafRef.current = requestAnimationFrame(scanLoop)
+
+      // 3秒後に映像が来ていなければカメラ占有エラーを表示
+      setTimeout(() => {
+        if (streamRef.current && video && video.videoWidth === 0) {
+          setError('カメラ映像を取得できませんでした。Zoom・Teams など他のアプリがカメラを使用中の可能性があります。他のアプリを閉じてからお試しください。')
+          stopCamera()
+        }
+      }, 3000)
     } catch (e) {
       const err = e as DOMException
       if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
