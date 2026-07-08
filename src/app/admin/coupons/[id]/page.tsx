@@ -6,6 +6,7 @@ import CouponCard from '@/components/CouponCard'
 import QRCodeDisplay from '@/components/QRCodeDisplay'
 import { formatDate } from '@/lib/utils'
 import { Coupon, CouponTier } from '@/lib/types'
+import DeleteButton from './DeleteButton'
 
 interface Props {
   params: Promise<{ id: string }>
@@ -58,6 +59,8 @@ export default async function CouponDetailAdminPage({ params }: Props) {
             </div>
           ))}
         </div>
+
+        <DeleteButton couponId={coupon.id} />
       </div>
     </div>
   )
