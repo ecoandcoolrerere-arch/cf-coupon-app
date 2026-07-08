@@ -33,7 +33,7 @@ export default function QRScanner({ onScan }: Props) {
     const canvas = canvasRef.current
     if (!video || !canvas || !streamRef.current) return
 
-    if (video.readyState >= video.HAVE_ENOUGH_DATA) {
+    if (video.readyState >= video.HAVE_ENOUGH_DATA && video.videoWidth > 0) {
       const ctx = canvas.getContext('2d', { willReadFrequently: true })
       if (ctx) {
         canvas.width = video.videoWidth
@@ -52,6 +52,34 @@ export default function QRScanner({ onScan }: Props) {
     rafRef.current = requestAnimationFrame(scanLoop)
   }
 
+  // active=true になりビデオ要素がDOMに追加された後にsrcObjectをセット
+  useEffect(() => {
+    if (!active) return
+
+    const video = videoRef.current
+    if (!video || !streamRef.current) return
+
+    video.srcObject = streamRef.current
+    video.play().catch(() => {})
+    rafRef.current = requestAnimationFrame(scanLoop)
+
+    const timer = setTimeout(() => {
+      if (streamRef.current && videoRef.current && videoRef.current.videoWidth === 0) {
+        setError('カメラ映像を取得できませんでした。Zoom・Teams など他のアプリがカメラを使用中の可能性があります。他のアプリを閉じてからお試しください。')
+        stopCamera()
+      }
+    }, 3000)
+
+    return () => {
+      clearTimeout(timer)
+      if (rafRef.current !== null) {
+        cancelAnimationFrame(rafRef.current)
+        rafRef.current = null
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active])
+
   async function startCamera() {
     setError(null)
     if (!navigator.mediaDevices?.getUserMedia) {
@@ -59,30 +87,15 @@ export default function QRScanner({ onScan }: Props) {
       return
     }
     try {
-      // ideal: 'environment' = 背面カメラ優先、なければ前面カメラにフォールバック
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: { ideal: 'environment' } },
       })
       streamRef.current = stream
-      const video = videoRef.current
-      if (video) {
-        video.srcObject = stream
-        video.play().catch(() => {})
-      }
-      setActive(true)
-      rafRef.current = requestAnimationFrame(scanLoop)
-
-      // 3秒後に映像が来ていなければカメラ占有エラーを表示
-      setTimeout(() => {
-        if (streamRef.current && video && video.videoWidth === 0) {
-          setError('カメラ映像を取得できませんでした。Zoom・Teams など他のアプリがカメラを使用中の可能性があります。他のアプリを閉じてからお試しください。')
-          stopCamera()
-        }
-      }, 3000)
+      setActive(true) // ここでビデオ要素がDOMに追加され、上のuseEffectが発火する
     } catch (e) {
       const err = e as DOMException
       if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-        setError('カメラへのアクセスが許可されていません。ブラウザのアドレスバー横の鍵アイコンからカメラを許可してください。')
+        setError('カメラへのアクセスが許可されていません。アドレスバー横の鍵アイコンからカメラを許可してください。')
       } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
         setError('カメラが見つかりません。カメラが接続されているか確認してください。')
       } else if (err.name === 'NotReadableError') {
@@ -100,7 +113,7 @@ export default function QRScanner({ onScan }: Props) {
       <canvas ref={canvasRef} className="hidden" />
       {active ? (
         <>
-          <div className="relative overflow-hidden rounded-xl border-2 border-primary">
+          <div className="relative overflow-hidden rounded-xl border-2 border-primary bg-black">
             <video
               ref={videoRef}
               className="h-64 w-64 object-cover"
