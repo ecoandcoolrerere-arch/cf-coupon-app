@@ -4,9 +4,9 @@ import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
 import CouponCard from '@/components/CouponCard'
 import QRCodeDisplay from '@/components/QRCodeDisplay'
-import { formatDate } from '@/lib/utils'
 import { Coupon, CouponTier } from '@/lib/types'
 import DeleteButton from './DeleteButton'
+import CouponDetailPanel from './CouponDetailPanel'
 
 interface Props {
   params: Promise<{ id: string }>
@@ -16,11 +16,10 @@ export default async function CouponDetailAdminPage({ params }: Props) {
   const { id } = await params
   const supabase = await createClient()
 
-  const { data: raw } = await supabase
-    .from('coupons')
-    .select('*, coupon_tiers(*)')
-    .eq('id', id)
-    .single()
+  const [{ data: raw }, { data: tiers }] = await Promise.all([
+    supabase.from('coupons').select('*, coupon_tiers(*)').eq('id', id).single(),
+    supabase.from('coupon_tiers').select('*').order('min_amount'),
+  ])
 
   if (!raw) notFound()
 
@@ -41,24 +40,7 @@ export default async function CouponDetailAdminPage({ params }: Props) {
           <QRCodeDisplay value={`/coupon/${coupon.code}`} size={160} />
         </div>
 
-        <div className="rounded-2xl bg-white p-6 shadow-sm space-y-2 text-sm">
-          <h2 className="font-bold mb-3">詳細情報</h2>
-          {[
-            ['ID', coupon.id],
-            ['コード', coupon.code],
-            ['支援者名', coupon.supporter_name ?? '—'],
-            ['メールアドレス', coupon.supporter_email ?? '—'],
-            ['支援額', coupon.support_amount ? `¥${coupon.support_amount.toLocaleString()}` : '—'],
-            ['リターン', tier?.name ?? '—'],
-            ['発行日', formatDate(coupon.issued_at)],
-            ['使用日', coupon.used_at ? formatDate(coupon.used_at) : '—'],
-          ].map(([label, value]) => (
-            <div key={label} className="flex justify-between gap-4">
-              <span className="text-gray-500 shrink-0">{label}</span>
-              <span className="font-medium text-right break-all">{value}</span>
-            </div>
-          ))}
-        </div>
+        <CouponDetailPanel coupon={coupon} tier={tier} tiers={tiers ?? []} />
 
         <DeleteButton couponId={coupon.id} />
       </div>
