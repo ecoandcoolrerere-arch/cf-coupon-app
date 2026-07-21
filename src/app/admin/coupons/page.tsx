@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
-import { Plus } from 'lucide-react'
+import { Plus, ArrowUp, ArrowDown } from 'lucide-react'
 import { formatDate } from '@/lib/utils'
 import { Coupon, CouponTier } from '@/lib/types'
 
@@ -9,22 +9,57 @@ type CouponRow = Coupon & { coupon_tiers: Pick<CouponTier, 'name' | 'discount_ty
 export default async function CouponsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; status?: string }>
+  searchParams: Promise<{ q?: string; status?: string; sort?: string; dir?: string }>
 }) {
-  const { q, status } = await searchParams
+  const { q, status, sort, dir } = await searchParams
   const supabase = await createClient()
+
+  const sortField = sort === 'tier' ? 'tier' : 'issued_at'
+  const sortDir = dir === 'asc' ? 'asc' : 'desc'
+
+  function sortHref(field: string) {
+    const nextDir = sortField === field && sortDir === 'asc' ? 'desc' : 'asc'
+    const params = new URLSearchParams()
+    if (q) params.set('q', q)
+    if (status) params.set('status', status)
+    params.set('sort', field)
+    params.set('dir', nextDir)
+    return `/admin/coupons?${params.toString()}`
+  }
+
+  let tierIds: string[] = []
+  if (q) {
+    const { data: matchedTiers } = await supabase
+      .from('coupon_tiers')
+      .select('id')
+      .ilike('name', `%${q}%`)
+    tierIds = matchedTiers?.map((t) => t.id) ?? []
+  }
 
   let query = supabase
     .from('coupons')
     .select('*, coupon_tiers(name, discount_type, discount_value)')
-    .order('issued_at', { ascending: false })
     .limit(200)
 
   if (status && status !== 'all') {
     query = query.eq('status', status)
   }
   if (q) {
-    query = query.or(`supporter_name.ilike.%${q}%,supporter_email.ilike.%${q}%,code.ilike.%${q}%`)
+    const orParts = [
+      `supporter_name.ilike.%${q}%`,
+      `supporter_email.ilike.%${q}%`,
+      `code.ilike.%${q}%`,
+    ]
+    if (tierIds.length) {
+      orParts.push(`tier_id.in.(${tierIds.join(',')})`)
+    }
+    query = query.or(orParts.join(','))
+  }
+
+  if (sortField === 'tier') {
+    query = query.order('name', { ascending: sortDir === 'asc', foreignTable: 'coupon_tiers' })
+  } else {
+    query = query.order('issued_at', { ascending: sortDir === 'asc' })
   }
 
   const { data: rawCoupons } = await query
@@ -58,17 +93,19 @@ export default async function CouponsPage({
           <input
             name="q"
             defaultValue={q}
-            placeholder="名前・メール・コードで検索"
-            className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm outline-none focus:border-primary w-64"
+            placeholder="名前・メール・コード・クーポン内容で検索"
+            className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm outline-none focus:border-primary w-72"
           />
           {status && <input type="hidden" name="status" value={status} />}
+          {sort && <input type="hidden" name="sort" value={sort} />}
+          {dir && <input type="hidden" name="dir" value={dir} />}
           <button type="submit" className="rounded-lg bg-gray-100 px-3 py-1.5 text-sm hover:bg-gray-200 transition">検索</button>
         </form>
         <div className="flex gap-1">
           {[['all', 'すべて'], ['unused', '未使用'], ['used', '使用済み'], ['expired', '期限切れ']].map(([val, label]) => (
             <Link
               key={val}
-              href={`/admin/coupons?status=${val}${q ? `&q=${q}` : ''}`}
+              href={`/admin/coupons?status=${val}${q ? `&q=${encodeURIComponent(q)}` : ''}${sort ? `&sort=${sort}` : ''}${dir ? `&dir=${dir}` : ''}`}
               className={`rounded-lg px-3 py-1.5 text-sm transition ${
                 (status ?? 'all') === val
                   ? 'bg-primary text-white'
@@ -88,10 +125,20 @@ export default async function CouponsPage({
             <tr className="border-b bg-gray-50">
               <th className="px-4 py-3 text-left font-medium text-gray-500">コード</th>
               <th className="px-4 py-3 text-left font-medium text-gray-500">支援者</th>
-              <th className="px-4 py-3 text-left font-medium text-gray-500">リターン</th>
+              <th className="px-4 py-3 text-left font-medium text-gray-500">
+                <Link href={sortHref('tier')} className="inline-flex items-center gap-1 hover:text-gray-700">
+                  リターン（クーポン内容）
+                  {sortField === 'tier' && (sortDir === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />)}
+                </Link>
+              </th>
               <th className="px-4 py-3 text-left font-medium text-gray-500">支援額</th>
               <th className="px-4 py-3 text-left font-medium text-gray-500">状態</th>
-              <th className="px-4 py-3 text-left font-medium text-gray-500">発行日</th>
+              <th className="px-4 py-3 text-left font-medium text-gray-500">
+                <Link href={sortHref('issued_at')} className="inline-flex items-center gap-1 hover:text-gray-700">
+                  発行日
+                  {sortField === 'issued_at' && (sortDir === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />)}
+                </Link>
+              </th>
               <th className="px-4 py-3" />
             </tr>
           </thead>
